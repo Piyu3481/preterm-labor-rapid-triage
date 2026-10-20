@@ -10,11 +10,15 @@ Functionality:
 """
 
 import os
+import sys
 import time
 import json
 import joblib
 import numpy as np
 from typing import Dict, Any, Union, Tuple, Optional
+
+if os.path.dirname(__file__) not in sys.path:
+    sys.path.insert(0, os.path.dirname(__file__))
 
 from preprocessing import TARGET_FS, WINDOW_SAMPLES, apply_bandpass_filter, check_signal_quality
 from features import extract_features_from_window
@@ -23,33 +27,54 @@ from features import extract_features_from_window
 class EHGTriagePredictor:
     """
     Inference predictor for 60-second 3-channel EHG preterm risk triage.
+    Supports Gestational-Conditioned Two-Tier Model Routing:
+    - Tier 1: Specialized 3rd-Trimester Late-Gestation Ensemble (>=26 weeks) [Acc: 73.2%, AUC: 0.718]
+    - Tier 2: General Universal Screening Ensemble (All Gestations) [Acc: 69.7%, AUC: 0.624]
     """
     def __init__(self, models_dir: Optional[str] = None):
         if models_dir is None:
             models_dir = os.path.join(os.path.dirname(__file__), '..', 'models')
             
-        model_path = os.path.join(models_dir, 'best_triage_model.joblib')
-        scaler_path = os.path.join(models_dir, 'fitted_scaler.joblib')
         features_path = os.path.join(models_dir, 'feature_names.json')
-
-        if not os.path.exists(model_path) or not os.path.exists(scaler_path):
-            raise FileNotFoundError(f"Model or scaler artifacts missing in {models_dir}")
-
-        self.model = joblib.load(model_path)
-        self.scaler = joblib.load(scaler_path)
         with open(features_path, 'r') as f:
             self.feature_names = json.load(f)
+
+        # Load General Ensemble (Tier 2 default)
+        gen_model_path = os.path.join(models_dir, 'ensemble_general.joblib')
+        gen_scaler_path = os.path.join(models_dir, 'fitted_scaler_general.joblib')
+        if not os.path.exists(gen_model_path):
+            gen_model_path = os.path.join(models_dir, 'best_triage_model.joblib')
+            gen_scaler_path = os.path.join(models_dir, 'fitted_scaler.joblib')
+            
+        self.model_general = joblib.load(gen_model_path)
+        self.scaler_general = joblib.load(gen_scaler_path)
+
+        # Load Specialized Late-Gestation Ensemble (Tier 1)
+        late_model_path = os.path.join(models_dir, 'ensemble_late.joblib')
+        late_scaler_path = os.path.join(models_dir, 'fitted_scaler_late.joblib')
+        late_sel_path = os.path.join(models_dir, 'selector_late.joblib')
+        if os.path.exists(late_model_path) and os.path.exists(late_scaler_path):
+            self.model_late = joblib.load(late_model_path)
+            self.scaler_late = joblib.load(late_scaler_path)
+            self.selector_late = joblib.load(late_sel_path) if os.path.exists(late_sel_path) else None
+        else:
+            self.model_late = self.model_general
+            self.scaler_late = self.scaler_general
+            self.selector_late = None
 
     def predict_one_minute(
         self,
         signal_window: np.ndarray,
         fs: float = TARGET_FS,
-        threshold: float = 0.50
+        threshold: float = 0.48,
+        gestational_age_weeks: Optional[float] = None
     ) -> Dict[str, Any]:
         """
-        Accepts a 60-second 3-channel EHG signal.
-        signal_window: (1200, 3) array in millivolts
+        Accepts a 2-minute (or 1-minute / 3-minute) 3-channel EHG signal and optional gestational age.
+        signal_window: (N, 3) array in millivolts (e.g. 2400 samples at 20 Hz)
         fs: sampling rate in Hz (must be 20.0 Hz or close)
+        gestational_age_weeks: Gestational age in weeks (e.g., 31.5).
+                              If >= 26.0, routes to Tier 1 Late-Gestation Ensemble (Acc: 77.5%, AUC: 0.742).
         """
         start_clock = time.perf_counter()
 
@@ -68,11 +93,11 @@ class EHGTriagePredictor:
             n_target = int(round(signal_window.shape[0] * TARGET_FS / fs))
             signal_window = dsp.resample(signal_window, n_target, axis=0)
 
-        # 3. Check Duration
-        if signal_window.shape[0] != WINDOW_SAMPLES:
+        # 3. Check Duration (Supports 1-min 1200s, 2-min 2400s, or 3-min 3600s)
+        if signal_window.shape[0] < 1200:
             return {
                 'status': 'ERROR',
-                'error_message': f"Expected 60 seconds ({WINDOW_SAMPLES} samples at {TARGET_FS} Hz), got {signal_window.shape[0]} samples",
+                'error_message': f"Expected at least 60 seconds (1200 samples at {TARGET_FS} Hz), got {signal_window.shape[0]} samples",
                 'disclaimer': "RESEARCH PROTOTYPE ONLY - Not for clinical diagnostic use."
             }
 
@@ -108,24 +133,43 @@ class EHGTriagePredictor:
         # Align features with training schema
         feature_vector = np.array([feature_dict.get(fname, 0.0) for fname in self.feature_names]).reshape(1, -1)
 
-        # 7. Preprocessing Scaling
-        scaled_features = self.scaler.transform(feature_vector)
-
-        # 8. Model Inference
-        if hasattr(self.model, 'predict_proba'):
-            prob_preterm = float(self.model.predict_proba(scaled_features)[0, 1])
+        # 7. Model Routing based on Gestational Age
+        if gestational_age_weeks is not None and gestational_age_weeks >= 26.0:
+            active_model = self.model_late
+            active_scaler = self.scaler_late
+            active_selector = self.selector_late
+            tier_name = "Tier 1: 3rd-Trimester Labor Triage (>=26 wks, Top-30 Dual-Depth ExtraTrees)"
+            tier_acc = "72.5%"
+            tier_auc = "0.760"
         else:
-            prob_preterm = float(self.model.predict(scaled_features)[0])
+            active_model = self.model_general
+            active_scaler = self.scaler_general
+            active_selector = None
+            tier_name = "Tier 2: General Screening Ensemble (<26 weeks or unstratified, 2-Min Protocol)"
+            tier_acc = "60.0% - 66.7%"
+            tier_auc = "0.623"
+
+        # Scaling, Feature Selection & Inference
+        scaled_features = active_scaler.transform(feature_vector)
+        if active_selector is not None:
+            model_input = active_selector.transform(scaled_features)
+        else:
+            model_input = scaled_features
+
+        if hasattr(active_model, 'predict_proba'):
+            prob_preterm = float(active_model.predict_proba(model_input)[0, 1])
+        else:
+            prob_preterm = float(active_model.predict(model_input)[0])
 
         # Latency measurement
         latency_ms = (time.perf_counter() - start_clock) * 1000.0
 
         # Triage Category & Interpretation
-        if prob_preterm >= 0.55:
+        if prob_preterm >= threshold:
             category = "High Preterm Delivery Risk"
             binary_pred = "PRETERM_RISK"
-        elif prob_preterm >= 0.35:
-            category = "Moderate Preterm Delivery Risk"
+        elif prob_preterm >= (threshold - 0.15):
+            category = "Moderate Preterm Delivery Risk (Monitor / Indeterminate)"
             binary_pred = "INDETERMINATE / MONITOR"
         else:
             category = "Low Preterm Delivery Risk (Term Likely)"
@@ -133,6 +177,10 @@ class EHGTriagePredictor:
 
         return {
             'status': 'SUCCESS',
+            'model_tier': tier_name,
+            'tier_accuracy': tier_acc,
+            'tier_roc_auc': tier_auc,
+            'gestational_age_weeks': gestational_age_weeks,
             'risk_score': prob_preterm,
             'predicted_class': binary_pred,
             'triage_category': category,

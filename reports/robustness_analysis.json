@@ -1,0 +1,14 @@
+{
+  "baseline_auc_mean": 0.5350341502611491,
+  "baseline_auc_std": 0.03507371724866938,
+  "max_energy_auc_mean": 0.549236641221374,
+  "max_energy_auc_std": 0.030764646002527585,
+  "auc_improvement": 0.014202490960224856,
+  "combined_std_sum": 0.06583836325119696,
+  "combined_std_quadrature": 0.0466543576239181,
+  "exceeds_combined_std_sum": false,
+  "exceeds_combined_std_quadrature": false,
+  "paired_diff_mean": 0.014202490960224985,
+  "paired_diff_std": 0.039803835793526796,
+  "paired_wins": 7
+}

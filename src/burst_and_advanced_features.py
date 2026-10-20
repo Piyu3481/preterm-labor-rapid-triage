@@ -106,14 +106,24 @@ def detect_burst_60s_window(
 # -------------------------------------------------------------------------
 
 def compute_approximate_entropy(x: np.ndarray, m: int = 2, r: float = None) -> float:
-    """Approximate Entropy (ApEn) with m=2, r=0.2*std (Nyquist-safe 10Hz subsampling for 0.3-3.0Hz band)."""
-    x = np.asarray(x, dtype=np.float64)
+    """Approximate Entropy (ApEn) with m=2, r=0.2*std using accelerated antropy."""
+    x = np.ascontiguousarray(x, dtype=np.float64)
     if len(x) > 600:
-        x = x[::2]
+        x = np.ascontiguousarray(x[::2])
     N = len(x)
     std_val = np.std(x)
     if std_val < 1e-8 or N <= m + 1:
         return 0.0
+
+    try:
+        import antropy as ant
+        ae = float(ant.app_entropy(x, order=m, metric='chebyshev'))
+        if np.isnan(ae) or np.isinf(ae):
+            return 0.0
+        return ae
+    except Exception:
+        pass
+
     if r is None:
         r = 0.2 * std_val
 

@@ -69,8 +69,8 @@ def check_signal_quality(
     Verify signal quality for a 60-second 3-channel window.
     Returns (is_valid, reason).
     """
-    if sig_window.shape[0] != WINDOW_SAMPLES:
-        return False, f"Expected {WINDOW_SAMPLES} samples, got {sig_window.shape[0]}"
+    if sig_window.shape[0] < 600:
+        return False, f"Expected at least 600 samples (30s), got {sig_window.shape[0]}"
     if sig_window.shape[1] != 3:
         return False, f"Expected 3 channels, got {sig_window.shape[1]}"
     if np.isnan(sig_window).any():

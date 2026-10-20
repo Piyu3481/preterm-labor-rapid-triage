@@ -1,0 +1,7 @@
+Protocol,Cohort,Cohort_N,Model,Accuracy,Balanced_Acc,Preterm_Sensitivity,Term_Specificity,ROC_AUC
+1-Minute (60s Baseline),3rd-Trimester Late (>=26 wks),138,Soft Ensemble,0.7319,0.5571,0.3158,0.7983,0.7178
+3-Minute (180s Pathway 3),3rd-Trimester Late (>=26 wks),138,ExtraTrees,0.7391304347826086,0.5612560813799203,0.3157894736842105,0.8067226890756303,0.6744803184431667
+3-Minute (180s Pathway 3),3rd-Trimester Late (>=26 wks),138,Soft Ensemble,0.7463768115942029,0.5654577620521892,0.3157894736842105,0.8151260504201681,0.6275984077841663
+1-Minute (60s Baseline),General Cohort (All Records),300,Soft Ensemble,0.6967,0.5788,0.4211,0.7366,0.6242
+3-Minute (180s Pathway 3),General Cohort (All Records),300,Soft Ensemble,0.6933333333333334,0.5881880273202089,0.4473684210526316,0.7290076335877863,0.6261550823623945
+3-Minute (180s Pathway 3),External Transfer TPEHGT,13,Soft Ensemble,0.6153846153846154,0.575,0.4,0.75,0.6499999999999999

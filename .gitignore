@@ -1,10 +1,25 @@
+# Virtual environments
 .venv/
 venv/
+env/
+
+# Python cache & bytecode
 __pycache__/
 *.py[cod]
-data/
-models/
-reports/
+*.so
+.pytest_cache/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Environment variables
 .env
 .env.*
 !.env.example
+
+# Exclude heavy raw signal binary data if any
+data/raw/
+*.dat

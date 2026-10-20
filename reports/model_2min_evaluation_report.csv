@@ -1,0 +1,4 @@
+Tier,Cohort_N,Accuracy,Balanced_Accuracy,Sensitivity,Specificity,ROC_AUC
+"Tier 1: 3rd-Trimester Labor Triage (>=26 wks, 2-Min Protocol)",138,0.7246376811594203,0.7076514816452897,0.6842105263157895,0.7310924369747899,0.760283060592658
+"Tier 2: General Screening Ensemble (All Records, 2-Min Protocol)",300,0.6,0.6022498995580554,0.6052631578947368,0.5992366412213741,0.6234431498593813
+External Transfer: TPEHGT (2-Min Protocol),13,0.46153846153846156,0.45,0.4,0.5,0.575

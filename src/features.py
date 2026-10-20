@@ -30,11 +30,9 @@ from typing import Dict, Any, List, Optional
 
 def compute_sample_entropy(x: np.ndarray, m: int = 2, r: Optional[float] = None) -> float:
     """
-    Calculate Sample Entropy (SampEn) for a 1D time series.
-    m: embedding dimension (default 2)
-    r: tolerance threshold (default 0.2 * standard deviation)
+    Calculate Sample Entropy (SampEn) for a 1D time series using antropy (C/Numba accelerated).
     """
-    x = np.asarray(x, dtype=np.float64)
+    x = np.ascontiguousarray(x, dtype=np.float64)
     n = len(x)
     std_val = np.std(x)
     if std_val < 1e-8 or n <= m + 1:
@@ -42,7 +40,15 @@ def compute_sample_entropy(x: np.ndarray, m: int = 2, r: Optional[float] = None)
     if r is None:
         r = 0.2 * std_val
 
-    # Fast vectorised template matching
+    try:
+        import antropy as ant
+        se = float(ant.sample_entropy(x, order=m, metric='chebyshev'))
+        if not np.isnan(se) and not np.isinf(se):
+            return se
+    except Exception:
+        pass
+
+    # Fast vectorised template matching fallback
     X_m = np.array([x[i:i + m] for i in range(n - m)])
     diff_m = np.abs(X_m[:, None, :] - X_m[None, :, :]).max(axis=2)
     B = (diff_m <= r).sum() - (n - m)
