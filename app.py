@@ -77,7 +77,12 @@ if page == "1-Minute Triage Inference":
         st.markdown("### 1. Patient & Signal Profile")
         sig_source = st.selectbox(
             "Select Input Signal:",
-            ["Preset: High-Risk Preterm Profile", "Preset: Low-Risk Term Profile", "Preset: Synthesized Contraction Burst", "Upload Custom CSV"]
+            [
+                "Preset: Low-Risk Term Profile (Normal Full-Term)",
+                "Preset: Medium-Risk Profile (Borderline / Monitor)",
+                "Preset: High-Risk Preterm Profile (Preterm Imminent)",
+                "Upload Custom CSV"
+            ]
         )
 
         gest_age = st.slider(
@@ -98,37 +103,40 @@ if page == "1-Minute Triage Inference":
             help="Calibrated operating point: t=0.48 achieves 0.760 ROC-AUC, 68.4% Preterm Recall (13/19 caught), and 70.8% Balanced Accuracy."
         )
         
-        # Generate or load signal
+        # Generate or load 2-minute (120s @ 20 Hz = 2400 samples) signal
         np.random.seed(42)
-        t = np.linspace(0, 60, WINDOW_SAMPLES)
+        n_samples_2min = 2400
+        t = np.linspace(0, 120, n_samples_2min)
         
-        if "Preterm" in sig_source:
-            burst = np.exp(-((t - 30)**2) / (2 * 8**2))
-            s1 = 0.08 * burst * np.sin(2 * np.pi * 0.85 * t) + 0.015 * np.random.randn(WINDOW_SAMPLES)
-            s2 = 0.07 * burst * np.sin(2 * np.pi * 0.82 * t + 0.2) + 0.015 * np.random.randn(WINDOW_SAMPLES)
-            s3 = 0.06 * burst * np.sin(2 * np.pi * 0.79 * t + 0.4) + 0.015 * np.random.randn(WINDOW_SAMPLES)
+        if "High-Risk" in sig_source:
+            burst = np.exp(-((t - 60)**2) / (2 * 12**2))
+            s1 = 0.09 * burst * np.sin(2 * np.pi * 0.88 * t) + 0.015 * np.random.randn(n_samples_2min)
+            s2 = 0.08 * burst * np.sin(2 * np.pi * 0.85 * t + 0.2) + 0.015 * np.random.randn(n_samples_2min)
+            s3 = 0.07 * burst * np.sin(2 * np.pi * 0.82 * t + 0.4) + 0.015 * np.random.randn(n_samples_2min)
             raw_sig = np.column_stack([s1, s2, s3])
-        elif "Term" in sig_source:
-            burst = np.exp(-((t - 30)**2) / (2 * 12**2))
-            s1 = 0.03 * burst * np.sin(2 * np.pi * 0.32 * t) + 0.01 * np.random.randn(WINDOW_SAMPLES)
-            s2 = 0.025 * burst * np.sin(2 * np.pi * 0.30 * t) + 0.01 * np.random.randn(WINDOW_SAMPLES)
-            s3 = 0.02 * burst * np.sin(2 * np.pi * 0.28 * t) + 0.01 * np.random.randn(WINDOW_SAMPLES)
+        elif "Medium-Risk" in sig_source:
+            burst = np.exp(-((t - 60)**2) / (2 * 14**2))
+            s1 = 0.05 * burst * np.sin(2 * np.pi * 0.55 * t) + 0.012 * np.random.randn(n_samples_2min)
+            s2 = 0.045 * burst * np.sin(2 * np.pi * 0.52 * t + 0.2) + 0.012 * np.random.randn(n_samples_2min)
+            s3 = 0.04 * burst * np.sin(2 * np.pi * 0.50 * t + 0.4) + 0.012 * np.random.randn(n_samples_2min)
+            raw_sig = np.column_stack([s1, s2, s3])
+        elif "Low-Risk" in sig_source:
+            burst = np.exp(-((t - 60)**2) / (2 * 18**2))
+            s1 = 0.02 * burst * np.sin(2 * np.pi * 0.28 * t) + 0.01 * np.random.randn(n_samples_2min)
+            s2 = 0.018 * burst * np.sin(2 * np.pi * 0.26 * t) + 0.01 * np.random.randn(n_samples_2min)
+            s3 = 0.016 * burst * np.sin(2 * np.pi * 0.25 * t) + 0.01 * np.random.randn(n_samples_2min)
             raw_sig = np.column_stack([s1, s2, s3])
         elif "Upload" in sig_source:
-            uploaded = st.file_uploader("Upload 60-second 3-channel CSV (1200 rows x 3 columns)", type=['csv'])
+            uploaded = st.file_uploader("Upload 2-minute 3-channel CSV (2400 rows x 3 columns)", type=['csv'])
             if uploaded is not None:
                 df_up = pd.read_csv(uploaded)
-                raw_sig = df_up.iloc[:1200, :3].values
+                raw_sig = df_up.iloc[:n_samples_2min, :3].values
             else:
-                raw_sig = 0.02 * np.random.randn(WINDOW_SAMPLES, 3)
+                raw_sig = 0.02 * np.random.randn(n_samples_2min, 3)
         else:
-            burst = np.exp(-((t - 25)**2) / 30) + 0.5 * np.exp(-((t - 45)**2) / 20)
-            s1 = 0.05 * burst * np.sin(2 * np.pi * 0.6 * t) + 0.012 * np.random.randn(WINDOW_SAMPLES)
-            s2 = 0.045 * burst * np.sin(2 * np.pi * 0.58 * t) + 0.012 * np.random.randn(WINDOW_SAMPLES)
-            s3 = 0.04 * burst * np.sin(2 * np.pi * 0.55 * t) + 0.012 * np.random.randn(WINDOW_SAMPLES)
-            raw_sig = np.column_stack([s1, s2, s3])
+            raw_sig = 0.02 * np.random.randn(n_samples_2min, 3)
 
-        run_btn = st.button("🚀 Run 1-Minute Triage", use_container_width=True)
+        run_btn = st.button("🚀 Run 2-Minute Triage", use_container_width=True)
 
     with col2:
         st.markdown("### 2. Signal Waveform (3 Bipolar Channels)")
@@ -153,17 +161,31 @@ if page == "1-Minute Triage Inference":
         
         st.info(f"🧬 **Active Model:** {result['model_tier']} | 5-Fold CV Accuracy: **{result['tier_accuracy']}** | ROC-AUC: **{result['tier_roc_auc']}**")
         
+        # Dual Classification Decision Banner
+        if result['predicted_class'] == 'TERM':
+            st.success(f"### 🟢 Final Clinical Classification: **TERM DELIVERY EXPECTED** (Risk: {result['risk_level']})")
+        elif result['predicted_class'] == 'PRETERM':
+            st.error(f"### 🔴 Final Clinical Classification: **PRETERM DELIVERY RISK** (Risk: {result['risk_level']})")
+        else:
+            st.warning(f"### 🟡 Final Clinical Classification: **BORDERLINE RISK** (Risk: {result['risk_level']})")
+
+        # Dual Probabilities & Triage Metrics
         m1, m2, m3, m4 = st.columns(4)
         with m1:
-            st.metric("Preterm Risk Score", f"{result['risk_score']:.1%}")
+            st.metric("Term Delivery Probability", f"{result['prob_term']:.1%}")
         with m2:
-            st.metric("Triage Category", result['triage_category'])
+            st.metric("Preterm Risk Probability", f"{result['prob_preterm']:.1%}")
         with m3:
-            st.metric("Inference Latency", f"{result['inference_latency_ms']} ms")
+            st.metric("Triage Risk Tier", f"{result['risk_level']} RISK")
         with m4:
-            st.metric("Signal Quality", result['signal_quality'])
+            st.metric("Inference Latency", f"{result['inference_latency_ms']} ms")
 
+        # Actionable Clinical Recommendation Box
+        st.markdown(f"**📋 Clinical Action Guidance:** *{result['action_guidance']}*")
+
+        # Visual Risk Gradient Bar
         st.progress(float(min(max(result['risk_score'], 0.0), 1.0)))
+        st.caption("Risk Scale: 🟢 Low Risk (< 33%) | 🟡 Medium Risk (33% – 48%) | 🔴 High Risk (≥ 48% Threshold)")
 
         st.markdown("#### Electrophysiological Biomarker Profile:")
         km = result['key_metrics']

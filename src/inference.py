@@ -164,16 +164,25 @@ class EHGTriagePredictor:
         # Latency measurement
         latency_ms = (time.perf_counter() - start_clock) * 1000.0
 
-        # Triage Category & Interpretation
+        # Compute Dual Probabilities
+        prob_term = float(1.0 - prob_preterm)
+
+        # 8. Tri-Level Triage Stratification & Actionable Clinical Guidance
         if prob_preterm >= threshold:
-            category = "High Preterm Delivery Risk"
-            binary_pred = "PRETERM_RISK"
-        elif prob_preterm >= (threshold - 0.15):
-            category = "Moderate Preterm Delivery Risk (Monitor / Indeterminate)"
-            binary_pred = "INDETERMINATE / MONITOR"
+            risk_level = "HIGH"
+            predicted_class = "PRETERM"
+            category = "High Preterm Delivery Risk (Preterm Likely)"
+            action_guidance = "Immediate obstetric evaluation; consider fetal fibronectin test, antenatal corticosteroids, and tocolytic triage."
+        elif prob_preterm >= max(0.25, threshold - 0.15):
+            risk_level = "MEDIUM"
+            predicted_class = "BORDERLINE / MONITOR"
+            category = "Moderate Risk (Indeterminate / Close Monitoring Required)"
+            action_guidance = "Repeat 2-minute EHG exam in 48-72 hours; schedule cervical length ultrasound scan."
         else:
-            category = "Low Preterm Delivery Risk (Term Likely)"
-            binary_pred = "TERM_LIKELY"
+            risk_level = "LOW"
+            predicted_class = "TERM"
+            category = "Low Preterm Delivery Risk (Full-Term Delivery Expected)"
+            action_guidance = "Normal quiescent uterine electrophysiology. Reassure patient and continue standard routine prenatal care."
 
         return {
             'status': 'SUCCESS',
@@ -181,9 +190,13 @@ class EHGTriagePredictor:
             'tier_accuracy': tier_acc,
             'tier_roc_auc': tier_auc,
             'gestational_age_weeks': gestational_age_weeks,
+            'predicted_class': predicted_class,
+            'risk_level': risk_level,
+            'prob_preterm': round(prob_preterm, 4),
+            'prob_term': round(prob_term, 4),
             'risk_score': prob_preterm,
-            'predicted_class': binary_pred,
             'triage_category': category,
+            'action_guidance': action_guidance,
             'decision_threshold': threshold,
             'inference_latency_ms': round(latency_ms, 2),
             'signal_quality': 'PASS',
