@@ -219,6 +219,11 @@ elif page == "Gestational Conditioning & Model Benchmarks":
         st.markdown("#### 2-Minute Production Best Model Evaluation (5-Fold Stratified Patient CV):")
         st.dataframe(df_m2, use_container_width=True)
 
+    roc_fig_path = os.path.join(figures_dir, 'roc_curve_2min_model.png')
+    if os.path.exists(roc_fig_path):
+        st.markdown("#### 📈 2-Minute Dual-Depth ExtraTrees ROC Curves:")
+        st.image(roc_fig_path, caption="Receiver Operating Characteristic (ROC) Curves across 5-Fold Stratified Patient CV (Tier 1 vs Tier 2)", use_container_width=True)
+
     st.markdown("---")
     st.markdown("### 4. Window Duration Expansion & Ablation Comparison")
     st.markdown("""
